@@ -1,7 +1,8 @@
 #include "hnm.h"
 
 /**
- * get_symbol_type - determines the symbol type character based on ELF symbol properties
+ * get_symbol_type - determines the
+ * symbol type character based on ELF symbol properties
  * @symbol: the ELF symbol structure
  * @section_headers: array of section headers
  * Return: character representing the symbol type
@@ -50,7 +51,8 @@ char get_symbol_type(Elf32_Sym symbol, Elf32_Shdr *section_headers)
 }
 
 /**
- * print_symbol_table32 - program that prints the symbol table for a 32-bit ELF file
+ * print_symbol_table32 - program
+ * that prints the symbol table for a 32-bit ELF file
  * considering special section indices and visibility attributes
  * @section_header: a pointer to the section header of the symbol table
  * @symbol_table: a pointer to the beginning of the symbol table
@@ -69,15 +71,13 @@ void print_symbol_table32(Elf32_Shdr *section_header, Elf32_Sym *symbol_table,
 	for (i = 0; i < symbol_count; i++)
 	{
 		Elf32_Sym symbol = symbol_table[i];
-		symbol_name = string_table + symbol.st_name;
 
+		symbol_name = string_table + symbol.st_name;
 		if (symbol.st_name != 0 && ELF32_ST_TYPE(symbol.st_info) != STT_FILE)
 		{
 			symbol_type = get_symbol_type(symbol, section_headers);
-
 			if (ELF32_ST_BIND(symbol.st_info) == STB_LOCAL)
 				symbol_type = tolower(symbol_type);
-			
 			if (symbol_type != 'U' && symbol_type != 'w')
 				printf("%08x %c %s\n", symbol.st_value, symbol_type, symbol_name);
 			else
@@ -94,16 +94,18 @@ void print_symbol_table32(Elf32_Shdr *section_header, Elf32_Sym *symbol_table,
  * @file_path: path to the file being processed
  * Return: 1 on success, 0 on failure
  */
-int read_elf_data(FILE *file, Elf32_Ehdr *elf_header, Elf32_Shdr **section_headers, char *file_path)
+int read_elf_data(FILE *file, Elf32_Ehdr *elf_header,
+Elf32_Shdr **section_headers, char *file_path)
 {
 	int is_little_endian, is_big_endian;
 
 	fread(elf_header, sizeof(Elf32_Ehdr), 1, file);
 
-	if (elf_header->e_ident[EI_CLASS] != ELFCLASS32 && elf_header->e_ident[EI_CLASS] != ELFCLASS64)
+	if (elf_header->e_ident[EI_CLASS] != ELFCLASS32 &&
+	elf_header->e_ident[EI_CLASS] != ELFCLASS64)
 	{
 		fprintf(stderr, "./hnm: %s: unsupported ELF file format\n", file_path);
-		return 0;
+		return (0);
 	}
 
 	is_little_endian = (elf_header->e_ident[EI_DATA] == ELFDATA2LSB);
@@ -112,20 +114,21 @@ int read_elf_data(FILE *file, Elf32_Ehdr *elf_header, Elf32_Shdr **section_heade
 	if (!is_little_endian && !is_big_endian)
 	{
 		fprintf(stderr, "./hnm: %s: unsupported ELF file endianness\n", file_path);
-		return 0;
+		return (0);
 	}
 
 	*section_headers = malloc(elf_header->e_shentsize * elf_header->e_shnum);
 	if (*section_headers == NULL)
 	{
-		fprintf(stderr, "./hnm: %s: memory allocation error for section_headers\n", file_path);
-		return 0;
+		fprintf(stderr, "./hnm: %s: memory allocation error for section_headers\n",
+		file_path);
+		return (0);
 	}
 
 	fseek(file, elf_header->e_shoff, SEEK_SET);
 	fread(*section_headers, elf_header->e_shentsize, elf_header->e_shnum, file);
 
-	return 1;
+	return (1);
 }
 
 /**
@@ -139,9 +142,10 @@ int read_elf_data(FILE *file, Elf32_Ehdr *elf_header, Elf32_Shdr **section_heade
  * @file_path: path to the file being processed
  * Return: 1 on success, 0 on failure
  */
-int find_and_read_tables(FILE *file, Elf32_Shdr *section_headers, Elf32_Ehdr *elf_header,
-			 Elf32_Sym **symbol_table, char **string_table, 
-			 Elf32_Shdr *symbol_table_header, char *file_path)
+int find_and_read_tables(FILE *file, Elf32_Shdr *section_headers,
+Elf32_Ehdr *elf_header,
+Elf32_Sym **symbol_table, char **string_table,
+Elf32_Shdr *symbol_table_header, char *file_path)
 {
 	int i, symbol_table_index = -1, string_table_index;
 	Elf32_Shdr string_table_header;
@@ -158,7 +162,7 @@ int find_and_read_tables(FILE *file, Elf32_Shdr *section_headers, Elf32_Ehdr *el
 	if (symbol_table_index == -1)
 	{
 		fprintf(stderr, "./hnm: %s: no symbols\n", file_path);
-		return 0;
+		return (0);
 	}
 
 	*symbol_table_header = section_headers[symbol_table_index];
@@ -175,7 +179,7 @@ int find_and_read_tables(FILE *file, Elf32_Shdr *section_headers, Elf32_Ehdr *el
 	fseek(file, string_table_header.sh_offset, SEEK_SET);
 	fread(*string_table, string_table_header.sh_size, 1, file);
 
-	return 1;
+	return (1);
 }
 
 /**
@@ -212,7 +216,7 @@ void process_elf_file32(char *file_path)
 		return;
 	}
 
-	if (!find_and_read_tables(file, section_headers, &elf_header, &symbol_table, 
+	if (!find_and_read_tables(file, section_headers, &elf_header, &symbol_table,
 				  &string_table, &symbol_table_header, file_path))
 	{
 		fclose(file);
@@ -220,7 +224,8 @@ void process_elf_file32(char *file_path)
 		return;
 	}
 
-	print_symbol_table32(&symbol_table_header, symbol_table, string_table, section_headers);
+	print_symbol_table32(&symbol_table_header, symbol_table,
+	string_table, section_headers);
 
 	fclose(file);
 	free(section_headers);
