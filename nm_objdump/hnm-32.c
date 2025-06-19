@@ -1,63 +1,7 @@
 #include "hnm.h"
 
-#include <ctype.h> /* for tolower() */
-
 /**
- * print_symbol_info32 - Determines and prints ELF32 symbol information.
- * @symbol: the symbol to inspect
- * @symbol_name: the name of the symbol (from string table)
- * @section_headers: the section headers array
- *
- * Return: void
- */
-void print_symbol_info32(Elf32_Sym symbol, char *symbol_name,
-						 Elf32_Shdr *section_headers, char symbol_type)
-{
-	if (ELF32_ST_BIND(symbol.st_info) == STB_WEAK)
-		if (symbol.st_shndx == SHN_UNDEF)
-			symbol_type = 'w';
-		else if (ELF32_ST_TYPE(symbol.st_info) == STT_OBJECT)
-			symbol_type = 'V';
-		else
-			symbol_type = 'W';
-	else if (symbol.st_shndx == SHN_UNDEF)
-		symbol_type = 'U';
-	else if (symbol.st_shndx == SHN_ABS)
-		symbol_type = 'A';
-	else if (symbol.st_shndx == SHN_COMMON)
-		symbol_type = 'C';
-	else if (symbol.st_shndx < SHN_LORESERVE)
-	{
-		Elf32_Shdr symbol_section = section_headers[symbol.st_shndx];
-
-		if (ELF32_ST_BIND(symbol.st_info) == STB_GNU_UNIQUE)
-			symbol_type = 'u';
-		else if (symbol_section.sh_type == SHT_NOBITS &&
-				 symbol_section.sh_flags == (SHF_ALLOC | SHF_WRITE))
-			symbol_type = 'B';
-		else if (symbol_section.sh_type == SHT_PROGBITS)
-			if (symbol_section.sh_flags == (SHF_ALLOC | SHF_EXECINSTR))
-				symbol_type = 'T';
-			else if (symbol_section.sh_flags == SHF_ALLOC)
-				symbol_type = 'R';
-			else if (symbol_section.sh_flags == (SHF_ALLOC | SHF_WRITE))
-				symbol_type = 'D';
-			else if (symbol_section.sh_type == SHT_DYNAMIC)
-				symbol_type = 'D';
-			else
-				symbol_type = 't';
-	}
-	if (ELF32_ST_BIND(symbol.st_info) == STB_LOCAL)
-		symbol_type = tolower(symbol_type);
-	if (symbol_type != 'U' && symbol_type != 'w')
-		printf("%08x %c %s\n", symbol.st_value, symbol_type, symbol_name);
-	else
-		printf("         %c %s\n", symbol_type, symbol_name);
-}
-
-/**
- * print_symbol_table32 - program that prints
- * the symbol table for a 32-bit ELF file
+ * print_symbol_table32 - program that prints the symbol table for a 32-bit ELF file
  * considering special section indices and visibility attributes
  * @section_header: a pointer to the section header of the symbol table
  * @symbol_table: a pointer to the beginning of the symbol table
@@ -65,24 +9,120 @@ void print_symbol_info32(Elf32_Sym symbol, char *symbol_name,
  *                which contains the names of the symbols
  * @section_headers: a pointer to the array of section headers for the ELF file
  * Return: nothing (void)
+ * Author: Frank Onyema Orji
  */
 
 void print_symbol_table32(Elf32_Shdr *section_header, Elf32_Sym *symbol_table,
-						  char *string_table, Elf32_Shdr *section_headers)
+			  char *string_table, Elf32_Shdr *section_headers)
 {
 	int i;
 	int symbol_count = section_header->sh_size / sizeof(Elf32_Sym);
-	char *symbol_name;
+	char *symbol_name, symbol_type;
 
 	for (i = 0; i < symbol_count; i++)
 	{
 		Elf32_Sym symbol = symbol_table[i];
-		char symbol_type = "?";
-
 		symbol_name = string_table + symbol.st_name;
+
+		/*
+		 * Le symbole doit avoir un nom (!= 0),
+		 * et le symbole ne doit pas être le nom d'un fichier source
+		 */
 		if (symbol.st_name != 0 && ELF32_ST_TYPE(symbol.st_info) != STT_FILE)
 		{
-			print_symbol_info32(symbol, symbol_name, section_headers, symbol_type);
+			symbol_type = '?';
+			/*
+			 * On s'assure que les symboles faibles non définis sont correctement
+			 * marqués comme 'w' avant d'attribuer 'U' aux symboles indéfinis
+			 */
+			if (ELF32_ST_BIND(symbol.st_info) == STB_WEAK)
+			{
+				if (symbol.st_shndx == SHN_UNDEF)
+				{
+					/* Symbole weak indéfini */
+					symbol_type = 'w';
+				}
+				else if (ELF32_ST_TYPE(symbol.st_info) == STT_OBJECT)
+				{
+					/* Symbole weak objet */
+					symbol_type = 'V';
+				}
+				else
+				{
+					/* Symbole weak défini */
+					symbol_type = 'W';
+				}
+			}
+			/* Indices de sections speciales */
+			else if (symbol.st_shndx == SHN_UNDEF)
+			{
+				symbol_type = 'U';
+			}
+			else if (symbol.st_shndx == SHN_ABS)
+			{
+				symbol_type = 'A';
+			}
+			else if (symbol.st_shndx == SHN_COMMON)
+			{
+				symbol_type = 'C';
+			}
+			else if (symbol.st_shndx < SHN_LORESERVE)
+			{
+				/*
+				 * S'il ne s'agit pas d'une section spéciale,
+				 * récupérer alors l'en-tête de la section
+				 */
+				Elf32_Shdr symbol_section = section_headers[symbol.st_shndx];
+
+				/* Vérifier les symboles faibles et uniques */
+				if (ELF32_ST_BIND(symbol.st_info) == STB_GNU_UNIQUE)
+				{
+					symbol_type = 'u';
+				}
+				/* Vérifier les types de section et les flags */
+				else if (symbol_section.sh_type == SHT_NOBITS &&
+					symbol_section.sh_flags == (SHF_ALLOC | SHF_WRITE))
+				{
+					symbol_type = 'B';
+				}
+				else if (symbol_section.sh_type == SHT_PROGBITS)
+				{
+					if (symbol_section.sh_flags == (SHF_ALLOC | SHF_EXECINSTR))
+					{
+						symbol_type = 'T';
+					}
+					else if (symbol_section.sh_flags == SHF_ALLOC)
+					{
+						symbol_type = 'R';
+					}
+					else if (symbol_section.sh_flags == (SHF_ALLOC | SHF_WRITE))
+					{
+						symbol_type = 'D';
+					}
+				}
+				else if (symbol_section.sh_type == SHT_DYNAMIC)
+				{
+					symbol_type = 'D';
+				}
+				else
+				{
+					symbol_type = 't';
+				}
+			}
+			/* Convertir en minuscule si le symbole est local */
+			if (ELF32_ST_BIND(symbol.st_info) == STB_LOCAL)
+			{
+				symbol_type = tolower(symbol_type);
+			}
+			/* Ne pas afficher l'adresse du symbole si elle équivaut à U ou w */
+			if (symbol_type != 'U' && symbol_type != 'w')
+			{
+				printf("%08x %c %s\n", symbol.st_value, symbol_type, symbol_name);
+			}
+			else
+			{
+				printf("         %c %s\n", symbol_type, symbol_name);
+			}
 		}
 	}
 }
