@@ -1,173 +1,197 @@
 #include "hnm.h"
-#include <stdio.h>
-#include <elf.h>
-#include <ctype.h>
+
+#include <ctype.h> /* for tolower() */
 
 /**
- * get_symbol_type32 - Get the symbol type character for a 32-bit symbol
- * @sym: the symbol entry
- * @sections: section headers of the ELF file
+ * print_symbol_info32 - Determines and prints ELF32 symbol information.
+ * @symbol: the symbol to inspect
+ * @symbol_name: the name of the symbol (from string table)
+ * @section_headers: the section headers array
  *
- * Return: a character representing the symbol type
+ * Return: void
  */
-char get_symbol_type32(Elf32_Sym sym, Elf32_Shdr *sections)
+void print_symbol_info32(Elf32_Sym symbol, char *symbol_name,
+						 Elf32_Shdr *section_headers, char symbol_type)
 {
-	Elf32_Shdr sec;
-	char type = '?';
-
-	if (ELF32_ST_BIND(sym.st_info) == STB_WEAK)
-	{
-		if (sym.st_shndx == SHN_UNDEF)
-			return ('w');
-		return ((ELF32_ST_TYPE(sym.st_info) == STT_OBJECT) ? 'V' : 'W');
-	}
-	if (sym.st_shndx == SHN_UNDEF)
-		return ('U');
-	if (sym.st_shndx == SHN_ABS)
-		return ('A');
-	if (sym.st_shndx == SHN_COMMON)
-		return ('C');
-	if (sym.st_shndx < SHN_LORESERVE)
-	{
-		sec = sections[sym.st_shndx];
-		if (ELF32_ST_BIND(sym.st_info) == STB_GNU_UNIQUE)
-			type = 'u';
-		else if (sec.sh_type == SHT_NOBITS &&
-				 sec.sh_flags == (SHF_ALLOC | SHF_WRITE))
-			type = 'B';
-		else if (sec.sh_type == SHT_PROGBITS)
-		{
-			if (sec.sh_flags == (SHF_ALLOC | SHF_EXECINSTR))
-				type = 'T';
-			else if (sec.sh_flags == SHF_ALLOC)
-				type = 'R';
-			else if (sec.sh_flags == (SHF_ALLOC | SHF_WRITE))
-				type = 'D';
-		}
-		else if (sec.sh_type == SHT_DYNAMIC)
-			type = 'D';
+	if (ELF32_ST_BIND(symbol.st_info) == STB_WEAK)
+		if (symbol.st_shndx == SHN_UNDEF)
+			symbol_type = 'w';
+		else if (ELF32_ST_TYPE(symbol.st_info) == STT_OBJECT)
+			symbol_type = 'V';
 		else
-			type = 't';
+			symbol_type = 'W';
+	else if (symbol.st_shndx == SHN_UNDEF)
+		symbol_type = 'U';
+	else if (symbol.st_shndx == SHN_ABS)
+		symbol_type = 'A';
+	else if (symbol.st_shndx == SHN_COMMON)
+		symbol_type = 'C';
+	else if (symbol.st_shndx < SHN_LORESERVE)
+	{
+		Elf32_Shdr symbol_section = section_headers[symbol.st_shndx];
+
+		if (ELF32_ST_BIND(symbol.st_info) == STB_GNU_UNIQUE)
+			symbol_type = 'u';
+		else if (symbol_section.sh_type == SHT_NOBITS &&
+				 symbol_section.sh_flags == (SHF_ALLOC | SHF_WRITE))
+			symbol_type = 'B';
+		else if (symbol_section.sh_type == SHT_PROGBITS)
+			if (symbol_section.sh_flags == (SHF_ALLOC | SHF_EXECINSTR))
+				symbol_type = 'T';
+			else if (symbol_section.sh_flags == SHF_ALLOC)
+				symbol_type = 'R';
+			else if (symbol_section.sh_flags == (SHF_ALLOC | SHF_WRITE))
+				symbol_type = 'D';
+			else if (symbol_section.sh_type == SHT_DYNAMIC)
+				symbol_type = 'D';
+			else
+				symbol_type = 't';
 	}
-	if (ELF32_ST_BIND(sym.st_info) == STB_LOCAL)
-		type = tolower(type);
-	return (type);
+	if (ELF32_ST_BIND(symbol.st_info) == STB_LOCAL)
+		symbol_type = tolower(symbol_type);
+	if (symbol_type != 'U' && symbol_type != 'w')
+		printf("%08x %c %s\n", symbol.st_value, symbol_type, symbol_name);
+	else
+		printf("         %c %s\n", symbol_type, symbol_name);
 }
 
 /**
- * print_symbol_table32 - Print the symbol table of a 32-bit ELF file
- * @section_header: the section header of the symbol table
- * @symbol_table: the array of symbols
- * @string_table: the symbol names string table
- * @section_headers: the array of section headers
+ * print_symbol_table32 - program that prints
+ * the symbol table for a 32-bit ELF file
+ * considering special section indices and visibility attributes
+ * @section_header: a pointer to the section header of the symbol table
+ * @symbol_table: a pointer to the beginning of the symbol table
+ * @string_table: a pointer to the beginning of the string table,
+ *                which contains the names of the symbols
+ * @section_headers: a pointer to the array of section headers for the ELF file
+ * Return: nothing (void)
  */
+
 void print_symbol_table32(Elf32_Shdr *section_header, Elf32_Sym *symbol_table,
 						  char *string_table, Elf32_Shdr *section_headers)
 {
-	int i, count = section_header->sh_size / sizeof(Elf32_Sym);
-	char type;
-	char *name;
+	int i;
+	int symbol_count = section_header->sh_size / sizeof(Elf32_Sym);
+	char *symbol_name;
 
-	for (i = 0; i < count; i++)
+	for (i = 0; i < symbol_count; i++)
 	{
-		Elf32_Sym sym = symbol_table[i];
+		Elf32_Sym symbol = symbol_table[i];
+		char symbol_type = "?";
 
-		name = string_table + sym.st_name;
-		if (sym.st_name != 0 && ELF32_ST_TYPE(sym.st_info) != STT_FILE)
+		symbol_name = string_table + symbol.st_name;
+		if (symbol.st_name != 0 && ELF32_ST_TYPE(symbol.st_info) != STT_FILE)
 		{
-			type = get_symbol_type32(sym, section_headers);
-			if (type != 'U' && type != 'w')
-				printf("%08x %c %s\n", sym.st_value, type, name);
-			else
-				printf("         %c %s\n", type, name);
+			print_symbol_info32(symbol, symbol_name, section_headers, symbol_type);
 		}
 	}
 }
 
 /**
- * handle_symbol_tables32 - Load and print ELF 32-bit symbol info
- * @file: Open file pointer
- * @file_path: Path to ELF file (for error messages)
- * @section_headers: Array of section headers
- * @symbol_table_index: Index of symbol table
- * @elf_header: ELF header
+ * process_elf_file32 - program that processes a 32-bit ELF file
+ * located at the given file path
+ * this function opens the file, reads the ELF header, and verifies
+ * the ELF format and endianness;
+ * it then reads the section headers to locate the symbol table
+ * and the string table;
+ * afterward, it reads the symbol table and string table from the file
+ * and calls 'print_symbol_table32' to print the symbol information
+ * @file_path: a pointer to a string that contains the path
+ *             to the ELF file to be processed
+ * Return: nothing (void)
  */
-void handle_symbol_tables32(FILE *file, char *file_path,
-			    Elf32_Shdr *section_headers,
-			    int symbol_table_index)
-{
-	if (symbol_table_index == -1)
-	{
-		fprintf(stderr, "./hnm: %s: no symbols\n", file_path);
-		free(section_headers);
-		fclose(file);
-		return;
-	}
 
-	Elf32_Shdr symbol_table_header = section_headers[symbol_table_index];
-	Elf32_Sym *symbol_table = malloc(symbol_table_header.sh_size);
-	int string_table_index = symbol_table_header.sh_link;
-	Elf32_Shdr string_table_header = section_headers[string_table_index];
-	char *string_table = malloc(string_table_header.sh_size);
-
-	fseek(file, symbol_table_header.sh_offset, SEEK_SET);
-	fread(symbol_table, symbol_table_header.sh_size, 1, file);
-
-	fseek(file, string_table_header.sh_offset, SEEK_SET);
-	fread(string_table, string_table_header.sh_size, 1, file);
-
-	print_symbol_table32(&symbol_table_header, symbol_table,
-			     string_table, section_headers);
-
-	free(section_headers);
-	free(symbol_table);
-	free(string_table);
-	fclose(file);
-}
-
-/**
- * process_elf_file32 - Entry point to process a 32-bit ELF file
- * @file_path: Path to ELF file
- */
 void process_elf_file32(char *file_path)
 {
-	int i, symbol_table_index = -1;
-	size_t size;
-	FILE *file = fopen(file_path, "rb");
-	Elf32_Ehdr elf_header;
-	Elf32_Shdr *section_headers;
+	int symbol_table_index = -1;
+	int i;
+	int is_little_endian, is_big_endian;
+	int string_table_index;
 
-	if (!file)
+	FILE *file = fopen(file_path, "rb");
+
+	if (file == NULL)
 	{
 		fprintf(stderr, "./hnm: %s: failed to open file\n", file_path);
 		return;
 	}
 
+	Elf32_Ehdr elf_header;
+
 	fread(&elf_header, sizeof(Elf32_Ehdr), 1, file);
-	if (elf_header.e_ident[EI_CLASS] != ELFCLASS32 ||
-	    (elf_header.e_ident[EI_DATA] != ELFDATA2LSB &&
-	     elf_header.e_ident[EI_DATA] != ELFDATA2MSB))
+
+	/* Il faut vérifier le type de fichier ELF */
+	if (elf_header.e_ident[EI_CLASS] != ELFCLASS32 && elf_header.e_ident[EI_CLASS] != ELFCLASS64)
 	{
-		fprintf(stderr, "./hnm: %s: unsupported ELF file\n", file_path);
+		fprintf(stderr, "./hnm: %s: unsupported ELF file format\n", file_path);
 		fclose(file);
 		return;
 	}
-	size = elf_header.e_shentsize * elf_header.e_shnum;
-	section_headers = malloc(size);
-	if (!section_headers)
+
+	/* Pour l'endianness */
+	is_little_endian = (elf_header.e_ident[EI_DATA] == ELFDATA2LSB);
+	is_big_endian = (elf_header.e_ident[EI_DATA] == ELFDATA2MSB);
+
+	if (!is_little_endian && !is_big_endian)
 	{
-		fprintf(stderr, "./hnm: %s: allocation error\n", file_path);
+		fprintf(stderr, "./hnm: %s: unsupported ELF file endianness\n", file_path);
 		fclose(file);
 		return;
 	}
+
+	/* Pour la table des sections */
+	Elf32_Shdr *section_headers = malloc(elf_header.e_shentsize * elf_header.e_shnum);
+
+	if (section_headers == NULL)
+	{
+		fprintf(stderr, "./hnm: %s: memory allocation error for section_headers\n", file_path);
+		fclose(file);
+		return;
+	}
+
 	fseek(file, elf_header.e_shoff, SEEK_SET);
 	fread(section_headers, elf_header.e_shentsize, elf_header.e_shnum, file);
+
+	/* Trouver l'index de la section de la table des symboles */
 	for (i = 0; i < elf_header.e_shnum; i++)
-		if (section_headers[i].sh_type == SHT_SYMTAB)
+	{
+		if (i < elf_header.e_shnum && section_headers[i].sh_type == SHT_SYMTAB)
 		{
 			symbol_table_index = i;
 			break;
 		}
-	handle_symbol_tables32(file, file_path, section_headers,
-			       symbol_table_index);
+	}
+
+	if (symbol_table_index == -1)
+	{
+		fprintf(stderr, "./hnm: %s: no symbols\n", file_path);
+		fclose(file);
+		free(section_headers);
+		return;
+	}
+
+	/* Lire la table des symboles */
+	Elf32_Shdr symbol_table_header = section_headers[symbol_table_index];
+	Elf32_Sym *symbol_table = malloc(symbol_table_header.sh_size);
+
+	fseek(file, symbol_table_header.sh_offset, SEEK_SET);
+	fread(symbol_table, symbol_table_header.sh_size, 1, file);
+
+	string_table_index = symbol_table_header.sh_link;
+
+	Elf32_Shdr string_table_header = section_headers[string_table_index];
+
+	char *string_table = malloc(string_table_header.sh_size);
+
+	fseek(file, string_table_header.sh_offset, SEEK_SET);
+	fread(string_table, string_table_header.sh_size, 1, file);
+
+	/* Afficher la table des symboles */
+	print_symbol_table32(&symbol_table_header, symbol_table, string_table, section_headers);
+
+	fclose(file);
+
+	free(section_headers);
+	free(symbol_table);
+	free(string_table);
 }
