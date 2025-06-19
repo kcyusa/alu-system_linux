@@ -1,46 +1,66 @@
+# ================================
+# Compiler and Flags Definitions
+# ================================
+
 # Compiler to use
-CC = gcc
+CC          = gcc
 
-# Compiler flags to ensure strict compliance with code standards and to enable debugging
-CFLAGS = -Wall -Werror -Wextra -pedantic -g -std=c99
+# Compiler flags for strict code compliance and debugging
+CFLAGS      = -Wall -Werror -Wextra -pedantic -g -std=c99
 
-# Additional flags for debugging
-DEBUGFLAGS = -g
+# Additional debug flags
+DEBUGFLAGS  = -g
 
-# Names of the target executables
-TARGET_0 = hnm
-TARGET_1 = hobjdump
+# ================================
+# Target Executable Names
+# ================================
+
+TARGET_0    = hnm
+TARGET_1    = hobjdump
+
+# ================================
+# Source and Header Files
+# ================================
 
 # Source files for the hnm program
-SOURCE_0 = hnm-64.c hnm-32.c hnm-main.c
+SOURCE_0    = hnm-64.c hnm-32.c hnm-main.c
 
 # Header files for the hnm program
-HEADERS_0 = hnm.h
+HEADERS_0   = hnm.h
 
 # Source files for the hobjdump program
-SOURCE_1 = hobjdump.c
+SOURCE_1    = hobjdump.c
 
-# Default rule to build all programs
+# ================================
+# Build Rules
+# ================================
+
+# Default target to build all programs
 all: $(TARGET_0) $(TARGET_1)
 
-# Rule to compile with debug information
+# Debug target: builds with debug flags
 debug: CFLAGS += $(DEBUGFLAGS)
 debug: all
 
-# Rule to build the hnm program
+# Build the hnm executable
 $(TARGET_0): $(SOURCE_0) $(HEADERS_0)
 	$(CC) $(CFLAGS) -o $(TARGET_0) $(SOURCE_0)
 
-# Rule to build the hobjdump program
+# Build the hobjdump executable
 $(TARGET_1): $(SOURCE_1)
 	$(CC) $(CFLAGS) -o $(TARGET_1) $(SOURCE_1)
 
-# Rule to clean up the compiled binaries and object files
+# ================================
+# Clean Rule
+# ================================
+
+# Remove all compiled binaries and temporary files
 clean:
 	rm -f $(TARGET_0) $(TARGET_1)
-	rm -f *.o
-	rm -f *.out
-	rm -f *~
+	rm -f *.o *.out *~
 
-# Declaring phony targets to avoid conflicts with files of the same name
+# ================================
+# Phony Targets
+# ================================
+
 .PHONY: all clean debug
