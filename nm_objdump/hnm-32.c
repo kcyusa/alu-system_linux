@@ -12,12 +12,14 @@ char get_symbol_type32(Elf32_Sym symbol, Elf32_Shdr *section_headers)
 	char type = '?';
 
 	if (ELF32_ST_BIND(symbol.st_info) == STB_WEAK)
+	{
 		if (symbol.st_shndx == SHN_UNDEF)
 			return ('w');
 		else if (ELF32_ST_TYPE(symbol.st_info) == STT_OBJECT)
 			return ('V');
 		else
 			return ('W');
+	}
 	if (symbol.st_shndx == SHN_UNDEF)
 		type = 'U';
 	else if (symbol.st_shndx == SHN_ABS)
@@ -72,7 +74,7 @@ void print_symbol_table32(Elf32_Shdr *section_header, Elf32_Sym *symbol_table,
 		{
 			char type = get_symbol_type32(sym, section_headers);
 
-			printf((type != 'U' && type != 'w') ? "%08x %c %s\n" : "         %c %s\n",
+			printf((type != 'U' && type != 'w') ? "%08x %c %s\n" : "         %c %d\n",
 				   sym.st_value, type, string_table + sym.st_name);
 		}
 	}
@@ -158,8 +160,6 @@ void process_elf_file32(char *path)
 		(void)fprintf(stderr, "./hnm: %s: open fail\n", path);
 		return;
 	}
-	if (!read_and_validate_elf32(file, &hdr, path))
-		return;
 	sections = load_section_headers(file, &hdr);
 	if (!sections)
 	{
