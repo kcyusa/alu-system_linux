@@ -10,7 +10,6 @@
  *                which contains the names of the symbols
  * @section_headers: a pointer to the array of section headers for the ELF file
  * Return: nothing (void)
- * Author: Frank Onyema Orji
  */
 
 void print_symbol_table64(Elf64_Shdr *section_header, Elf64_Sym *symbol_table,
@@ -170,7 +169,6 @@ void process_elf_file64(char *file_path)
 		return;
 	}
 
-	/* Pour l'endianness */
 	is_little_endian = (elf_header.e_ident[EI_DATA] == ELFDATA2LSB);
 	is_big_endian = (elf_header.e_ident[EI_DATA] == ELFDATA2MSB);
 
